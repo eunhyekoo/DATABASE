@@ -1,0 +1,870 @@
+﻿using System;
+
+using System.Collections.Generic;
+
+using System.ComponentModel;
+
+using System.Data;
+
+using System.Drawing;
+
+using System.Linq;
+
+using System.Text;
+
+using System.Windows.Forms;
+
+using System.Data.OleDb;
+
+using System.Collections;
+
+
+
+namespace WindowsFormsApplication1
+
+{
+
+    public partial class Form1 : Form
+
+    {
+
+        OleDbConnection conn;
+
+        string connectionString;
+
+
+
+        TextBox[] textBoxes;
+
+        Label[] labels;
+
+        List<Type> types = new List<Type>();
+
+
+
+        public Form1()
+
+        {
+
+            InitializeComponent();
+
+            dataGridView1.Rows.Clear();
+
+
+
+            textBoxes = new TextBox[] { txt0, txt1, txt2, txt3, txt4, txt5, txt6, txt7 };
+
+            labels = new Label[] { label3, label4, label5, label6, label7, label8, label9, label10 };
+
+
+
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+
+        {
+
+            dataGridView1.Rows.Clear(); // GridView와 Combobox의 내용을 모두 지우기
+
+            selectTable.Items.Clear();
+
+            if (conn != null)   // 기존에 연결되어있는 DB가 있으면 연결 해제
+
+            {
+
+                conn.Close();
+
+            }
+
+
+
+            connectionString = "Provider=OraOLEDB.Oracle;Password=" + txtBoxPw.Text + ";User ID=" + txtboxId.Text;//oracle 서버 연결
+
+
+
+            //연결 스트링에 대한 정보 
+
+            //Oracle - MSDAORA 
+
+
+
+            conn = new OleDbConnection(connectionString);
+
+            conn.Open(); //데이터베이스 연결
+
+
+
+            OleDbCommand cmd = new OleDbCommand();
+
+            cmd.CommandText = "select table_name from tabs"; // 테이블 불러오기
+
+            cmd.CommandType = CommandType.Text; //검색명령을 쿼리 형태로
+
+            cmd.Connection = conn;
+
+            OleDbDataReader read = cmd.ExecuteReader();
+
+            while (read.Read())
+
+            {
+
+                selectTable.Items.Add(read.GetValue(0));
+
+            } // Combobox에 테이블이름 Item으로 추가
+
+
+
+            selectTable.SelectedIndex = 0; // 첫번째 테이블 선택
+
+
+
+            updatedb();
+
+        }
+
+        private void updatedb()
+
+        {
+
+            dataGridView1.Rows.Clear();
+
+
+
+            try
+
+            {
+
+                if (conn != null) conn.Close();
+
+                conn.Open(); //데이터베이스 연결
+
+                OleDbCommand cmd = new OleDbCommand();
+
+                cmd.CommandText = "select * from " + selectTable.Text; //해당 테이블의 내용 불러오기
+
+                cmd.CommandType = CommandType.Text; //검색명령을 쿼리 형태로
+
+                cmd.Connection = conn;
+
+
+
+                OleDbDataReader read = cmd.ExecuteReader(); //select * from ~ 결과
+
+                int count = read.FieldCount; // 해당 테이블의 column 수를 지정
+
+                dataGridView1.ColumnCount = count;
+
+
+
+                types.Clear();
+
+
+
+                //필드명 받아오는 반복문
+
+                for (int i = 0; i < count; i++)
+
+                {
+
+                    dataGridView1.Columns[i].Name = read.GetName(i);
+
+                    textBoxes[i].Visible = true;
+
+                    labels[i].Text = dataGridView1.Columns[i].Name;
+
+                    labels[i].Visible = true;
+
+                    types.Add(read.GetFieldType(i));
+
+                }
+
+
+
+                //행 단위로 반복
+
+                while (read.Read())
+
+                {
+
+                    object[] obj = new object[count]; // 필드수만큼 오브젝트 배열
+
+
+
+                    for (int i = 0; i < count; i++) // 필드 수만큼 반복
+
+                    {
+
+                        obj[i] = new object();
+
+                        obj[i] = read.GetValue(i); // 오브젝트배열에 데이터 저장
+
+                    }
+
+
+
+                    dataGridView1.Rows.Add(obj); //데이터그리드뷰에 오브젝트 배열 추가
+
+                }
+
+
+
+                read.Close();
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                MessageBox.Show("Error: " + ex.Message); //에러 메세지 
+
+            }
+
+        }
+
+
+
+        private void button2_Click(object sender, EventArgs e) //추가버튼
+
+        {
+
+            dataGridView1.Rows.Clear();
+
+
+
+
+
+            conn = new OleDbConnection(connectionString);
+
+            try
+
+            {
+
+                conn.Open();
+
+                OleDbCommand cmd = new OleDbCommand();
+
+
+
+                cmd.CommandText = "SELECT C.COLUMN_NAME FROM USER_CONS_COLUMNS C, USER_CONSTRAINTS S WHERE C.CONSTRAINT_NAME = S.CONSTRAINT_NAME AND S.CONSTRAINT_TYPE = 'P' AND C.TABLE_NAME = '"
+
+                   + selectTable.Text + "'"; // 테이블의 기본키를 가져온다.
+
+                textBox1.Text = cmd.CommandText;
+
+                cmd.CommandType = CommandType.Text; //검색명령을 쿼리 형태로
+
+                cmd.Connection = conn;
+
+
+
+                OleDbDataReader read = cmd.ExecuteReader();
+
+                List<object> PK = new List<object>();
+
+
+
+                while (read.Read())
+
+                {
+
+                    PK.Add(read.GetValue(0));
+
+                } // 테이블의 기본 키 지정
+
+                conn.Close();
+
+
+
+                conn.Open(); //데이터베이스 연결
+
+
+
+                string cmdText = "INSERT INTO " + selectTable.Text + " VALUES(";
+
+                for (int j = 0; j < dataGridView1.ColumnCount; j++)
+
+                {
+
+                    if (PK.Contains(labels[j].Text))
+
+                    {
+
+                        if (textBoxes[j].Text != "")
+
+                        {
+
+                            if (types[j] == typeof(System.Decimal) || types[j] == typeof(System.Double))
+
+                                cmdText += textBoxes[j].Text;
+
+                            else
+
+                                cmdText += "'" + textBoxes[j].Text + "'";
+
+
+
+                            if (j != dataGridView1.ColumnCount - 1) cmdText += ", ";
+
+                            else cmdText += ")";
+
+                        }
+
+                    }
+
+                    else
+                    {
+
+                        if (textBoxes[j].Text != "")
+                        {
+
+                            if (types[j] == typeof(System.Decimal) || types[j] == typeof(System.Double))
+
+                                cmdText += textBoxes[j].Text;
+
+                            else
+
+                                cmdText += "'" + textBoxes[j].Text + "'";
+
+
+
+                            if (j != dataGridView1.ColumnCount - 1) cmdText += ", ";
+
+                            else cmdText += ")";
+
+                        }
+
+
+
+                        else
+
+                        {
+
+                            cmdText += "NULL";
+
+                            if (j != dataGridView1.ColumnCount - 1) cmdText += ", ";
+
+                            else cmdText += ")";
+
+                        }
+
+                    }
+
+                }
+
+                cmd.CommandText = cmdText;
+
+                textBox1.Text = cmd.CommandText;
+
+                cmd.CommandType = CommandType.Text; //검색명령을 쿼리 형태로
+
+                cmd.Connection = conn;
+
+
+
+                cmd.ExecuteNonQuery(); //쿼리문을 실행하고 영향받는 행의 수를 반환.
+
+                updatedb();
+
+
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                MessageBox.Show("Error: " + ex.Message); //에러 메세지 
+
+            }
+
+            finally
+
+            {
+
+                if (conn != null)
+
+                {
+
+                    conn.Close(); //데이터베이스 연결 해제
+
+                }
+
+            }
+
+        }
+
+
+
+        private void button3_Click(object sender, EventArgs e) //삭제버튼
+
+        {
+
+            dataGridView1.Rows.Clear();
+
+
+
+            conn = new OleDbConnection(connectionString);
+
+            try
+
+            {
+
+                conn.Open(); //데이터베이스 연결
+
+                OleDbCommand cmd = new OleDbCommand();
+
+
+
+                cmd.CommandText = "SELECT C.COLUMN_NAME FROM USER_CONS_COLUMNS C, USER_CONSTRAINTS S WHERE C.CONSTRAINT_NAME = S.CONSTRAINT_NAME AND S.CONSTRAINT_TYPE = 'P' AND C.TABLE_NAME = '"
+
+                    + selectTable.Text + "'"; // 테이블의 기본키를 가져온다.
+
+                textBox1.Text = cmd.CommandText;
+
+                cmd.CommandType = CommandType.Text; //검색명령을 쿼리 형태로
+
+                cmd.Connection = conn;
+
+
+
+                OleDbDataReader read = cmd.ExecuteReader();
+
+                List<object> PK = new List<object>();
+
+
+
+                while (read.Read())
+
+                {
+
+                    PK.Add(read.GetValue(0));
+
+                } // 테이블의 기본 키 지정
+
+                conn.Close();
+
+                conn.Open();
+
+
+
+                string cmdText = "DELETE FROM " + selectTable.Text + " WHERE ";
+
+
+
+                if (PK.Count != 0)  // 기본키가 있는 경우
+
+                {
+
+                    for (int j = 0; j < PK.Count; j++)
+
+                    {
+
+                        int index = 0;
+
+                        cmdText += PK[j] + " = ";
+
+                        for (int k = 0; k < dataGridView1.ColumnCount; k++)
+
+                        {
+
+                            if (labels[k].Text == PK[j].ToString()) index = k;
+
+                        }
+
+                        if (types[index] == typeof(System.Decimal) || types[index] == typeof(System.Double))
+
+                            cmdText += textBoxes[index].Text;
+
+                        else
+
+                            cmdText += "'" + textBoxes[index].Text + "'";
+
+
+
+                        if (j != PK.Count - 1) cmdText += " AND ";
+
+                    }
+
+                }
+
+                else
+                { // 기본키가 없는 경우
+
+                    if (types[0] == typeof(System.Decimal) || types[0] == typeof(System.Double))
+
+                        cmdText += labels[0].Text + " = " + textBoxes[0].Text;
+
+                    else
+
+                        cmdText += labels[0].Text + " = '" + textBoxes[0].Text + "'";
+
+                }
+
+                cmd.CommandText = cmdText;
+
+                textBox1.Text = cmd.CommandText; // 기본 키를 기준으로 속성을 삭제한다.
+
+
+
+                cmd.CommandType = CommandType.Text; //검색명령을 쿼리 형태로
+
+                cmd.Connection = conn;
+
+
+
+                cmd.ExecuteNonQuery(); //쿼리문을 실행하고 영향받는 행의 수를 반환.
+
+                updatedb();
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                MessageBox.Show("Error: " + ex.Message); //에러 메세지 
+
+            }
+
+            finally
+
+            {
+
+                if (conn != null)
+
+                {
+
+                    conn.Close(); //데이터베이스 연결 해제
+
+                }
+
+            }
+
+        }
+
+
+
+        private void button4_Click(object sender, EventArgs e) //수정버튼
+
+        {
+
+            conn = new OleDbConnection(connectionString);
+
+            try
+
+            {
+
+                conn.Open(); //데이터베이스 연결
+
+                OleDbCommand cmd = new OleDbCommand();
+
+
+
+                cmd.CommandText = "SELECT C.COLUMN_NAME FROM USER_CONS_COLUMNS C, USER_CONSTRAINTS S WHERE C.CONSTRAINT_NAME = S.CONSTRAINT_NAME AND S.CONSTRAINT_TYPE = 'P' AND C.TABLE_NAME = '"
+
+                    + selectTable.Text + "'"; // 테이블의 기본키를 가져온다.
+
+                textBox1.Text = cmd.CommandText;
+
+                cmd.CommandType = CommandType.Text; //검색명령을 쿼리 형태로
+
+                cmd.Connection = conn;
+
+
+
+                OleDbDataReader read = cmd.ExecuteReader();
+
+                List<object> PK = new List<object>();
+
+
+
+                while (read.Read())
+
+                {
+
+                    PK.Add(read.GetValue(0));
+
+                } // 테이블의 기본 키 지정
+
+                conn.Close();
+
+
+
+                conn.Open();
+
+
+
+                string cmdText = "UPDATE " + selectTable.Text + " SET ";
+
+                if (PK.Count != 0)
+
+                {
+
+                    for (int j = 0; j < dataGridView1.ColumnCount; j++)
+
+                    {
+
+                        if (PK.Contains(labels[j].Text)) { }
+
+                        else
+
+                        {
+
+                            if (textBoxes[j].Text != "")
+
+                            {
+
+                                if (types[j] == typeof(System.Decimal) || types[j] == typeof(System.Double))
+
+                                    cmdText += labels[j].Text + " = " + textBoxes[j].Text;
+
+                                else
+
+                                    cmdText += labels[j].Text + " = '" + textBoxes[j].Text + "'";
+
+                            }
+
+                            else
+
+                            {
+
+                                cmdText += labels[j].Text + " = NULL";
+
+                            }
+
+                            if (j != dataGridView1.ColumnCount - 1) cmdText += ", ";
+
+                            else cmdText += " WHERE ";
+
+                        }
+
+                    }
+
+                    for (int j = 0; j < PK.Count; j++)
+
+                    {
+
+                        cmdText += PK[j] + " = ";
+
+                        int index = 0;
+
+                        for (int k = 0; k < dataGridView1.ColumnCount; k++)
+
+                        {
+
+                            if (labels[k].Text == PK[j].ToString()) index = k;
+
+                        }
+
+                        if (types[index] == typeof(System.Decimal) || types[index] == typeof(System.Double))
+
+                            cmdText += textBoxes[index].Text;
+
+                        else
+
+                            cmdText += "'" + textBoxes[index].Text + "'";
+
+
+
+                        if (j != PK.Count - 1) cmdText += " AND ";
+
+                    }
+
+                }
+
+                else
+
+                {
+
+                    for (int j = 1; j < dataGridView1.ColumnCount; j++)
+
+                    {
+
+                        if (textBoxes[j].Text != "")
+
+                        {
+
+                            if (types[j] == typeof(System.Decimal) || types[j] == typeof(System.Double))
+
+                                cmdText += labels[j].Text + " = " + textBoxes[j].Text;
+
+                            else
+
+                                cmdText += labels[j].Text + " = '" + textBoxes[j].Text + "'";
+
+                        }
+
+                        else
+
+                        {
+
+                            cmdText += labels[j].Text + " = NULL";
+
+                        }
+
+                        if (j != dataGridView1.ColumnCount - 1) cmdText += ", ";
+
+                        else cmdText += " WHERE ";
+
+                    }
+
+                    if (types[0] == typeof(System.Decimal) || types[0] == typeof(System.Double))
+
+                        cmdText += labels[0].Text + " = " + textBoxes[0].Text;
+
+                    else
+
+                        cmdText += labels[0].Text + " = '" + textBoxes[0].Text + "'";
+
+                }
+
+                cmd.CommandText = cmdText;
+
+                textBox1.Text = cmd.CommandText;
+
+                cmd.CommandType = CommandType.Text; //검색명령을 쿼리 형태로
+
+                cmd.Connection = conn;
+
+
+
+                cmd.ExecuteNonQuery(); //쿼리문을 실행하고 영향받는 행의 수를 반환.
+
+                updatedb();
+
+            }
+
+            catch (Exception ex)
+
+            {
+
+                MessageBox.Show("Error: " + ex.Message); //에러 메세지 
+
+            }
+
+            finally
+
+            {
+
+                if (conn != null)
+
+                {
+
+                    conn.Close(); //데이터베이스 연결 해제
+
+                }
+
+            }
+
+
+
+        }
+
+
+
+        private void button5_Click(object sender, EventArgs e) //초기화버튼
+
+        {
+
+            dataGridView1.Rows.Clear();
+
+            txt0.Clear();
+
+            txt1.Clear();
+
+            txt2.Clear();
+
+            txt3.Clear();
+
+            txt4.Clear();
+
+            txt5.Clear();
+
+            txt6.Clear();
+
+            txt7.Clear();
+
+            conn = new OleDbConnection(connectionString);
+
+            conn.Open(); //데이터베이스 연결
+
+            updatedb();
+
+        }
+
+
+
+        private void txtBoxPw_KeyDown(object sender, KeyEventArgs e)
+
+        {
+
+            if (e.KeyCode == Keys.Enter)
+
+            {
+
+                button1_Click(sender, e);
+
+            }
+
+
+
+        }
+
+
+
+        private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
+
+        {
+
+            if (dataGridView1.Rows[e.RowIndex].Cells[0].Value != null)
+
+            {
+
+                for (int i = 0; i < 8; i++)
+
+                {
+
+                    if (textBoxes[i].Visible == true)
+
+                        if (labels[i].Text == "HIREDATE")
+
+                            textBoxes[i].Text = dataGridView1.Rows[e.RowIndex].Cells[i].Value.ToString().Substring(0, 10);
+
+                        else
+
+                            textBoxes[i].Text = dataGridView1.Rows[e.RowIndex].Cells[i].Value.ToString();
+
+                }
+
+            } // 데이터그리드에서 항목을 선택했을시 텍스트 박스에 내용을 표시해 줌
+
+        }
+
+
+
+        private void selectTable_SelectedIndexChanged(object sender, EventArgs e)
+
+        {
+
+            for (int i = 0; i < 8; i++)
+
+            {
+
+                textBoxes[i].Visible = false;
+
+                labels[i].Visible = false;
+
+            }
+
+            // 화면에 보이는 텍스트박스와 레이블을 모두 숨김
+
+
+
+            button5_Click(sender, e);
+
+        }
+
+    }
+
+}

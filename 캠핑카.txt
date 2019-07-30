@@ -1,0 +1,179 @@
+
+
+사용자명 : system
+비밀번호 : Tkshdehd1234(오라클 설치 시 부여한 비번으로)
+
+create tablespace customer
+      datafile 'customer.dbf' SIZE 500M
+      default storage(initial 100k next 100k minextents 2 maxextents 50 pctincrease 50);
+
+create user eunhye identified by 1111 default tablespace customer;
+grant dba to eunhye;
+
+conn eunhye/1111
+
+create table 고객(
+고객명 CHAR(10),
+면허증번호 CHAR(10),
+전화번호 CHAR(11),
+constraint 고객_PK primary key(면허증번호));
+
+
+///////////////////////////////
+create table 대여회사(
+회사ID CHAR(10),
+회사명 CHAR(10),
+전화번호 CHAR(11),
+constraint 대여회사_PK primary key(회사ID));
+
+
+
+
+create table 캠핑카(
+캠핑카ID CHAR(10), 회사ID CHAR(10),캠핑카이름 CHAR(10), 차량번호 CHAR(10),
+constraint 캠핑카_PK primary key(캠핑카ID),
+constraint 캠핑카_대여회사_FK foreign key(회사ID)
+REFERENCES 대여회사(회사ID) ON DELETE CASCADE);
+
+
+
+
+create table 정비소( 
+정비소ID CHAR(10), 정비소명 CHAR(15), 전화번호 CHAR(11),
+constraint 정비소_PK primary key(정비소ID));
+
+
+
+create table 정비(정비번호 CHAR(10), 캠핑카ID CHAR(10),  면허증번호 CHAR(10),정비소ID CHAR(10),내역 CHAR(20),
+날짜 CHAR(20), 비용 CHAR(20),
+constraint 정비_PK primary key(정비번호),
+constraint 정비_고객_PK foreign key(면허증번호)
+REFERENCES 고객(면허증번호) ON DELETE CASCADE,
+constraint 정비_캠핑카_FK foreign key(캠핑카ID)
+REFERENCES 캠핑카(캠핑카ID) ON DELETE CASCADE,
+constraint 정비_정비소_FK foreign key(정비소ID)
+REFERENCES 정비소(정비소ID) ON DELETE CASCADE);
+
+
+
+
+
+
+
+INSERT INTO 캠핑카 VALUES('koo202','koo100','코끼리','ELE200');
+INSERT INTO 캠핑카 VALUES('koo203','koo101','코끼리', 'EGG201');
+INSERT INTO 캠핑카 VALUES('koo200','koo100','코끼리','ELE200');
+INSERT INTO 캠핑카 VALUES('koo201','koo101', '독수리', 'EGG201');
+
+INSERT INTO 정비소 VALUES('koo300', '정비소1','01012345678');
+
+INSERT INTO 정비소 VALUES('koo301', '정비소2','01098765432');
+
+
+
+
+/고객은 grant 해서 만들기 대여내역 확인할수있는 view 설정
+
+
+
+create table 대여(대여번호 CHAR(10), 캠핑카ID CHAR(10), 
+면허증번호 CHAR(10),  시작일 CHAR(15), 반납여부 CHAR(10), 
+constraint  대여_PK primary key(대여번호),
+constraint 대여_캠핑카_FK foreign key(캠핑카ID)
+REFERENCES 캠핑카(캠핑카ID) ON DELETE CASCADE,
+constraint 대여_고객_FK foreign key(면허증번호)
+REFERENCES 고객(면허증번호) ON DELETE CASCADE);
+
+
+
+//숫자로 USER 등록할수있는지??
+
+INSERT INTO  대여회사 VALUES('koo100','떠나자','0411234567');
+
+
+CREATE USER koo100 identified by 1111;
+
+GRANT CONNECT TO koo100;
+
+CREATE VIEW koo100_관리 AS
+SELECT a.회사ID, c.캠핑카ID, 면허증번호, 반납여부 FROM 캠핑카 c, 대여 e, 대여회사 a WHERE a.회사ID = c.회사ID
+AND c.캠핑카ID = e.캠핑카ID AND a.회사ID = 'koo100';
+
+GRANT SELECT,insert, update ON koo100_관리 TO koo100;
+
+
+INSERT INTO 대여회사 VALUES('koo101','캠프파이어','0411239876');
+
+
+CREATE USER koo101 identified by 1111;
+
+GRANT CONNECT TO koo101;
+
+CREATE VIEW koo101_관리 AS
+SELECT a.회사ID, c.캠핑카ID, e.면허증번호, e. 시작일, e.반납여부 FROM 캠핑카 c, 대여 e, 대여회사 a WHERE a.회사ID = c.회사ID
+AND c.캠핑카ID = e.캠핑카ID AND a.회사ID = 'koo101';
+
+GRANT select,insert,update ON koo101_관리 TO koo101;
+
+
+대여회사가 대여에 접근하는 법
+
+conn koo100/1111
+
+select * from eunhye.koo100_관리;
+
+
+conn koo101/1111
+select * from eunhye.koo101_관리;
+//////////////////////////////////
+
+
+INSERT INTO  VALUES ( 'KOO','koo1000', '0109999999');
+CREATE USER koo1000 identified by 1111;
+
+GRANT CONNECT TO koo1000;
+
+CREATE VIEW koo_캠핑카대여 AS
+select a.면허증번호, b.캠핑카이름, c.시작일 from 고객 a, 캠핑카 b, 대여 c where b.캠핑카ID = c.캠핑카ID AND a.면허증번호 = c.면허증번호 
+AND a.고객명 = 'KOO';
+GRANT SELECT ON koo_캠핑카대여 TO koo1000; 
+grant select on 캠핑카 to koo1000;
+INSERT INTO 고객 VALUES ('CHOI','koo1100', '01033333333');
+CREATE USER koo1100 identified by 1111;
+
+GRANT CONNECT TO koo1100;
+CREATE VIEW koo_캠핑카대여2 AS
+select a.면허증번호, b.캠핑카이름, c.시작일 from 고객 a, 캠핑카 b, 대여 c where b.캠핑카ID = c.캠핑카ID AND a.면허증번호 = c.면허증번호 
+AND a.고객명 = 'CHOI';
+
+grant select on 캠핑카 to koo1100;
+GRANT SELECT ON koo_캠핑카대여2 TO koo1100; 
+/////////////////////////
+
+
+
+conn koo1000/1111
+select * from eunhye.koo_캠핑카대여;
+select * from eunhye.캠핑카;
+conn koo1100/1111
+select *from eunhye.koo_캠핑카대여2;
+
+conn eunhye/1111;
+
+INSERT INTO 대여 VALUES('9000','koo200','koo1000','2018/11/11','NO');
+INSERT INTO 대여 VALUES('9900','koo201','koo1100','2018/10/10', 'YES');
+sele
+INSERT INTO 정비 VALUES('8000','koo200',’koo1000’,'koo300','타이어교체','2018/11/10','150000');
+
+
+
+create user fix8000 identified by 1111;
+grant connect to fix8000;
+create view 정비내역_8000 as
+select * from 정비 where 정비번호 = 8000;
+
+grant select on 정비내역_8000 to fix8000;
+
+
+
+
